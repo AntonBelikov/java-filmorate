@@ -26,26 +26,7 @@ public class UserController {
 
     @PostMapping
     public User create(@RequestBody User user) {
-        if (user.getEmail().isBlank() || !user.getEmail().contains("@")) {
-            log.error("Ошибка в Email");
-            throw new ValidationException("Email пустой или не содержит @");
-        }
-
-        if (user.getLogin().isBlank() || user.getLogin().contains(" ")) {
-            log.error("Ошибка в login");
-            throw new ValidationException("Логин пустой или не содержит пробелы");
-        }
-
-        if (user.getName() == null || user.getName().isBlank()) {
-            log.info("Имя взято из логина");
-            user.setName(user.getLogin());
-        }
-
-        if (user.getBirthday().isAfter(LocalDate.now())) {
-            log.error("Дата рождения в будущем");
-            throw new ValidationException("Дата рождения должна быть раньше текущей даты");
-        }
-
+        validate(user);
         user.setId(idCounter++);
         users.put(user.getId(), user);
         log.info("Пользователь добавлен: {}", user);
@@ -59,6 +40,13 @@ public class UserController {
             throw new NotFoundObject("Пользователь с данным id не найден");
         }
 
+        validate(user);
+        users.put(user.getId(), user);
+        log.info("Пользователь обновлен: {}", user);
+        return user;
+    }
+
+    private void validate(User user) {
         if (user.getEmail().isBlank() || !user.getEmail().contains("@")) {
             log.error("Ошибка в Email");
             throw new ValidationException("Email пустой или не содержит @");
@@ -78,9 +66,5 @@ public class UserController {
             log.error("Дата рождения в будущем");
             throw new ValidationException("Дата рождения должна быть раньше текущей даты");
         }
-
-        users.put(user.getId(), user);
-        log.info("Пользователь обновлен: {}", user);
-        return user;
     }
 }

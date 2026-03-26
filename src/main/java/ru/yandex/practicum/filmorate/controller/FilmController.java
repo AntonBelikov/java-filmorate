@@ -26,26 +26,7 @@ public class FilmController {
 
     @PostMapping
     public Film create(@RequestBody Film film) {
-        if (film.getName().isBlank()) {
-            log.error("У фильма пустое название");
-            throw new ValidationException("Название не может быть пустым");
-        }
-
-        if (film.getDescription().length() > 200) {
-            log.error("В описании фильма много символов");
-            throw new ValidationException("Описание не должно быть длиннее 200 символов");
-        }
-
-        if (film.getReleaseDate().isBefore(LocalDate.of(1895, 12, 28))) {
-            log.error("Очень ранний фильм");
-            throw new ValidationException("Дата должна быть после 28 декабря 1895 года");
-        }
-
-        if (film.getDuration() < 0) {
-            log.error("Продолжительность отрицательная");
-            throw new ValidationException("Продолжительность не может быть меньше 0");
-        }
-
+        validate(film);
         film.setId(idCounter++);
         films.put(film.getId(), film);
         log.info("Фильм добавлен: {}", film);
@@ -59,6 +40,13 @@ public class FilmController {
             throw new NotFoundObject("Фильм с данным id не найден");
         }
 
+        validate(film);
+        films.put(film.getId(), film);
+        log.info("Фильм обновлен: {}", film);
+        return film;
+    }
+
+    private void validate(Film film) {
         if (film.getName().isBlank()) {
             log.error("У фильма пустое название");
             throw new ValidationException("Название не может быть пустым");
@@ -78,9 +66,5 @@ public class FilmController {
             log.error("Продолжительность отрицательная");
             throw new ValidationException("Продолжительность не может быть меньше 0");
         }
-
-        films.put(film.getId(), film);
-        log.info("Фильм обновлен: {}", film);
-        return film;
     }
 }
