@@ -52,10 +52,10 @@ public class FilmController {
         return film;
     }
 
-    @PutMapping("/{id}")
-    public Film update(@PathVariable int id, @RequestBody Film film) {
-        if (!films.containsKey(id)) {
-            log.error("Фильм с id {} не найден", id);
+    @PutMapping
+    public Film update(@RequestBody Film film) {
+        if (!films.containsKey(film.getId())) {
+            log.error("Фильм с id {} не найден", film.getId());
             throw new NotFoundObject("Фильм с данным id не найден");
         }
 
@@ -79,7 +79,6 @@ public class FilmController {
             throw new ValidationException("Продолжительность не может быть меньше 0");
         }
 
-        film.setId(id);
         films.put(film.getId(), film);
         log.info("Фильм обновлен: {}", film);
         return film;

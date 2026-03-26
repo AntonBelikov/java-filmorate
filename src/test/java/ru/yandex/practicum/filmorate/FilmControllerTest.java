@@ -60,11 +60,13 @@ public class FilmControllerTest {
         Film film = new Film("Зеленый фонарь", "Лучшая работа Рельнольдса", LocalDate.of(2011, 6, 16), 120);
         filmController.create(film);
 
-        Film film1 = new Film("Зеленый фонарь", "Могло быть и лучше", LocalDate.of(2011, 6, 16), 120);
-        filmController.update(1, film1);
+        Film film1 = new Film(1, "Зеленый фонарь", "Могло быть и лучше", LocalDate.of(2011, 6, 16), 120);
+        filmController.update(film1);
+
+        Film film2 = new Film(2, "Зеленый фонарь", "Могло быть и лучше", LocalDate.of(2011, 6, 16), 120);
 
         Assertions.assertFalse(filmController.findAll().contains(film));
         Assertions.assertTrue(filmController.findAll().contains(film1));
-        Assertions.assertThrows(NotFoundObject.class, () -> filmController.update(2, film1));
+        Assertions.assertThrows(NotFoundObject.class, () -> filmController.update(film2));
     }
 }

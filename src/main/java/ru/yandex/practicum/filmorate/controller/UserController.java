@@ -36,7 +36,7 @@ public class UserController {
             throw new ValidationException("Логин пустой или не содержит пробелы");
         }
 
-        if (user.getName().isBlank()) {
+        if (user.getName() == null || user.getName().isBlank()) {
             log.info("Имя взято из логина");
             user.setName(user.getLogin());
         }
@@ -52,10 +52,10 @@ public class UserController {
         return user;
     }
 
-    @PutMapping("/{id}")
-    public User update(@PathVariable int id, @RequestBody User user) {
-        if (!users.containsKey(id)) {
-            log.error("Фильм с id {} не найден", id);
+    @PutMapping
+    public User update(@RequestBody User user) {
+        if (!users.containsKey(user.getId())) {
+            log.error("Пользователь с id {} не найден", user.getId());
             throw new NotFoundObject("Пользователь с данным id не найден");
         }
 
@@ -69,7 +69,7 @@ public class UserController {
             throw new ValidationException("Логин пустой или не содержит пробелы");
         }
 
-        if (user.getName().isBlank()) {
+        if (user.getName() == null || user.getName().isBlank()) {
             log.info("Имя взято из логина");
             user.setName(user.getLogin());
         }
@@ -79,7 +79,6 @@ public class UserController {
             throw new ValidationException("Дата рождения должна быть раньше текущей даты");
         }
 
-        user.setId(id);
         users.put(user.getId(), user);
         log.info("Пользователь обновлен: {}", user);
         return user;

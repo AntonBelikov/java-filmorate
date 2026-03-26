@@ -61,11 +61,13 @@ public class UserControllerTest {
         User user = new User("Kate@yandex.ru", "KateKate", "", LocalDate.of(1999, 12, 12));
         userController.create(user);
 
-        User user1 = new User("Kate@yandex.ru", "Katerina", "", LocalDate.of(1999, 10, 12));
-        userController.update(1, user1);
+        User user1 = new User(1, "Kate@yandex.ru", "Katerina", "", LocalDate.of(1999, 10, 12));
+        userController.update(user1);
+
+        User user2 = new User(2, "Kate@yandex.ru", "Katerina", "", LocalDate.of(1999, 10, 12));
 
         Assertions.assertFalse(userController.findAll().contains(user));
         Assertions.assertTrue(userController.findAll().contains(user1));
-        Assertions.assertThrows(NotFoundObject.class, () -> userController.update(2, user1));
+        Assertions.assertThrows(NotFoundObject.class, () -> userController.update(user2));
     }
 }
