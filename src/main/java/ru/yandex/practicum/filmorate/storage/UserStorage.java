@@ -7,9 +7,12 @@ import java.util.Optional;
 
 public interface UserStorage {
     User create(User user);
-    void delete(int id);
-    User update(User user);
-    Collection<User> findAll();
-    Optional<User> findById(int id);
 
+    void delete(int id);
+
+    User update(User user);
+
+    Collection<User> findAll();
+
+    Optional<User> findById(int id);
 }
