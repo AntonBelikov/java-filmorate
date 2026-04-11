@@ -30,7 +30,7 @@ public class UserController {
 
     @GetMapping("/{id}")
     public User findById(@PathVariable int id) {
-        return userService.checkUser(id);
+        return userService.getUserOrElseThrow(id);
     }
 
     @PutMapping("/{id}/friends/{friendId}")

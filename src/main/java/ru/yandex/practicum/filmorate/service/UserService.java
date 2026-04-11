@@ -24,8 +24,8 @@ public class UserService {
     }
 
     public void addFriend(int userId, int friendId) {
-        User user1 = checkUser(userId);
-        User user2 = checkUser(friendId);
+        User user1 = getUserOrElseThrow(userId);
+        User user2 = getUserOrElseThrow(friendId);
 
         user1.getFriends().add(friendId);
         user2.getFriends().add(userId);
@@ -51,8 +51,8 @@ public class UserService {
     }
 
     public void removeFriend(int userId, int friendId) {
-        User user1 = checkUser(userId);
-        User user2 = checkUser(friendId);
+        User user1 = getUserOrElseThrow(userId);
+        User user2 = getUserOrElseThrow(friendId);
 
         user1.getFriends().remove(friendId);
         user2.getFriends().remove(userId);
@@ -60,7 +60,7 @@ public class UserService {
     }
 
     public Collection<User> getUserFrinds(int id) {
-        User user = checkUser(id);
+        User user = getUserOrElseThrow(id);
         log.info("Получен списко друзей пользователя {}", user);
         return user.getFriends().stream()
                 .map(userStorage::findById)
@@ -69,8 +69,8 @@ public class UserService {
     }
 
     public Collection<User> getSameFriends(int userId, int anotherUserId) {
-        User user1 = checkUser(userId);
-        User user2 = checkUser(anotherUserId);
+        User user1 = getUserOrElseThrow(userId);
+        User user2 = getUserOrElseThrow(anotherUserId);
         log.info("Получен списко совместных друзей пользователей {} и {}", user1, user2);
         return user1.getFriends().stream()
                 .filter(user2.getFriends()::contains)
@@ -84,7 +84,7 @@ public class UserService {
         return userStorage.findAll();
     }
 
-    public User checkUser(int id) {
+    public User getUserOrElseThrow(int id) {
         log.info("Проверка наличия пользователя в списке");
         return userStorage.findById(id)
                 .orElseThrow(() -> new NotFoundObject("Пользователь не найден: " + id));

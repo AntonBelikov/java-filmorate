@@ -44,16 +44,16 @@ public class FilmService {
     }
 
     public void addLikes(int filmId, int userId) {
-        User user = userService.checkUser(userId);
-        Film film = filmCheck(filmId);
+        User user = userService.getUserOrElseThrow(userId);
+        Film film = getUserOrElseThrow(filmId);
         film.getLikes().add(userId);
         log.info("Пользователь {} поставил лайк фильму {}", user, film);
     }
 
     public void removeLikes(int filmId, int userId) {
-        User user = userService.checkUser(userId);
-        Film film = filmCheck(filmId);
-        filmCheck(filmId).getLikes().remove(userId);
+        User user = userService.getUserOrElseThrow(userId);
+        Film film = getUserOrElseThrow(filmId);
+        getUserOrElseThrow(filmId).getLikes().remove(userId);
         log.info("Пользователь {} убрал лайк фильму {}", user, film);
     }
 
@@ -70,7 +70,7 @@ public class FilmService {
         return filmStorage.findAll();
     }
 
-    public Film filmCheck(int id) {
+    public Film getUserOrElseThrow(int id) {
         log.info("Проверка фильма по списку");
         return filmStorage.findById(id)
                 .orElseThrow(() -> new NotFoundObject("Фильм не найден: " + id));
