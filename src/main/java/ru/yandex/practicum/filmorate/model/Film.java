@@ -20,6 +20,9 @@ public class Film {
     private LocalDate releaseDate;
     private int duration;
     private final Set<Integer> likes = new HashSet<>();
+    @NonNull
+    private MpaRating mpaRating;
+    private Set<Genre> genre = new HashSet<>();
 
     public Film(@NonNull String name, @NonNull String description, @NonNull LocalDate releaseDate, int duration) {
         this.name = name;
