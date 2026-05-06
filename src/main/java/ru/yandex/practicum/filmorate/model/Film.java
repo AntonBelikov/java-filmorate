@@ -31,4 +31,12 @@ public class Film {
         this.duration = duration;
         id = 0;
     }
+
+    public Film(@NonNull int id, @NonNull String name, @NonNull String description, @NonNull LocalDate releaseDate, int duration) {
+        this.name = name;
+        this.description = description;
+        this.releaseDate = releaseDate;
+        this.duration = duration;
+        this.id = id;
+    }
 }
