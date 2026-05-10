@@ -1,28 +1,25 @@
 package ru.yandex.practicum.filmorate.storage;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.mapper.FilmRowMapper;
 import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.exceptions.NotFoundObject;
 import ru.yandex.practicum.filmorate.model.Genre;
 
-import java.sql.Date;
 import java.sql.PreparedStatement;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.sql.Statement;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class FilmDbStorage implements FilmStorage {
     private final JdbcTemplate jdbc;
     private final FilmRowMapper mapper;
+    private final GenreDbStorage genreDbStorage;
 
     @Override
     public Film create(Film film) {
@@ -31,29 +28,18 @@ public class FilmDbStorage implements FilmStorage {
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
-        int rows = jdbc.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
+        jdbc.update(conn -> {
+            PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, film.getName());
             ps.setString(2, film.getDescription());
-            ps.setDate(3, Date.valueOf(film.getReleaseDate()));
+            ps.setObject(3, film.getReleaseDate());
             ps.setInt(4, film.getDuration());
-            ps.setInt(5, film.getMpa().getId());
+            ps.setLong(5, film.getMpa().getId());
             return ps;
         }, keyHolder);
 
-        if (rows == 0) {
-            throw new NotFoundObject("Фильм с id=" + film.getId() + " не найден");
-        }
-
         film.setId(keyHolder.getKey().intValue());
-
-        if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            String sqlGenres = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
-            for (Genre genre : film.getGenres()) {
-                jdbc.update(sqlGenres, film.getId(), genre.getId());
-            }
-        }
-
+        genreDbStorage.addGenresToFilm(film.getId(), film.getGenres());
         return film;
     }
 
@@ -84,8 +70,33 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Collection<Film> findAll() {
-        String sql = "SELECT f.*, m.name AS mpa_name FROM films f JOIN mpa_ratings m ON f.mpa_id = m.id";
-        return jdbc.query(sql, mapper);
+        String sql = """
+                SELECT f.*, m.name AS mpa_name
+                FROM films f
+                JOIN mpa_ratings m ON f.mpa_id = m.id
+                """;
+
+        List<Film> films = jdbc.query(sql, mapper);
+
+        if (films.isEmpty()) {
+            return films;
+        }
+
+        Set<Integer> ids = films.stream()
+                .map(Film::getId)
+                .collect(Collectors.toSet());
+
+        Map<Integer, List<Genre>> genresByFilm = genreDbStorage.findGenresForFilms(ids);
+
+        Map<Integer, Set<Integer>> likesByFilm = findLikesForFilms(ids);
+
+        for (Film film : films) {
+            film.setGenres(new LinkedHashSet<>(
+                    genresByFilm.getOrDefault(film.getId(), List.of())
+            ));
+        }
+
+        return films;
     }
 
     @Override
@@ -109,12 +120,39 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public List<Film> getPopular(int count) {
-        String sql = "SELECT f.*, m.name AS mpa_name FROM films f " +
-                "LEFT JOIN likes l ON f.id = l.film_id " +
-                "JOIN mpa_ratings m ON f.mpa_id = m.id " +
-                "GROUP BY f.id, m.name " +
-                "ORDER BY (SELECT COUNT(user_id) FROM likes WHERE film_id = f.id) DESC " +
+        String sql = "SELECT f.*, m.name AS mpa_name \n" +
+                "FROM films f \n" +
+                "LEFT JOIN likes l ON f.id = l.film_id -- Используй LEFT JOIN\n" +
+                "JOIN mpa_ratings m ON f.mpa_id = m.id \n" +
+                "GROUP BY f.id, m.name \n" +
+                "ORDER BY COUNT(l.user_id) DESC, f.id ASC \n" +
                 "LIMIT ?";
         return jdbc.query(sql, mapper, count);
+    }
+
+    private Map<Integer, Set<Integer>> findLikesForFilms(Set<Integer> filmIds) {
+        if (filmIds.isEmpty()) {
+            return Map.of();
+        }
+
+        String placeholders = filmIds.stream()
+                .map(id -> "?")
+                .collect(Collectors.joining(","));
+
+        String sql = """
+                SELECT film_id, user_id
+                FROM likes
+                WHERE film_id IN (%s)
+                """.formatted(placeholders);
+
+        Map<Integer, Set<Integer>> result = new HashMap<>();
+
+        jdbc.query(sql, rs -> {
+            int filmId = rs.getInt("film_id");
+            int userId = rs.getInt("user_id");
+            result.computeIfAbsent(filmId, k -> new HashSet<>()).add(userId);
+        }, filmIds.toArray());
+
+        return result;
     }
 }
