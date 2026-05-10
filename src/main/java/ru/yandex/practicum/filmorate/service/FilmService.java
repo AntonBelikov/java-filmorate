@@ -11,7 +11,6 @@ import ru.yandex.practicum.filmorate.storage.FilmStorage;
 
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -45,24 +44,21 @@ public class FilmService {
 
     public void addLikes(int filmId, int userId) {
         User user = userService.getUserOrElseThrow(userId);
-        Film film = getUserOrElseThrow(filmId);
-        film.getLikes().add(userId);
+        Film film = getFilmOrElseThrow(filmId);
+        filmStorage.addLike(filmId, userId);
         log.info("Пользователь {} поставил лайк фильму {}", user, film);
     }
 
     public void removeLikes(int filmId, int userId) {
         User user = userService.getUserOrElseThrow(userId);
-        Film film = getUserOrElseThrow(filmId);
-        getUserOrElseThrow(filmId).getLikes().remove(userId);
+        Film film = getFilmOrElseThrow(filmId);
+        filmStorage.removeLike(filmId, userId);
         log.info("Пользователь {} убрал лайк фильму {}", user, film);
     }
 
     public Collection<Film> getMostPopular(int size) {
         log.info("Получен список {} самых популярных фильмов", size);
-        return filmStorage.findAll().stream()
-                .sorted((film1, film2) -> film2.getLikes().size() - film1.getLikes().size())
-                .limit(size)
-                .collect(Collectors.toList());
+        return filmStorage.getPopular(size);
     }
 
     public Collection<Film> getAll() {
@@ -70,7 +66,7 @@ public class FilmService {
         return filmStorage.findAll();
     }
 
-    public Film getUserOrElseThrow(int id) {
+    public Film getFilmOrElseThrow(int id) {
         log.info("Проверка фильма по списку");
         return filmStorage.findById(id)
                 .orElseThrow(() -> new NotFoundObject("Фильм не найден: " + id));
