@@ -90,9 +90,7 @@ public class FilmService {
         Map<Integer, List<Genre>> genresByFilm = genreStorage.findGenresForFilms(ids);
 
         films.forEach(film -> {
-            TreeSet<Genre> sorted = new TreeSet<>(Comparator.comparingLong(Genre::getId));
-            sorted.addAll(genresByFilm.getOrDefault(film.getId(), List.of()));
-            film.setGenres(sorted);
+            film.setGenres(new LinkedHashSet<>(genresByFilm.getOrDefault(film.getId(), List.of())));
         });
 
         return films;
@@ -103,12 +101,7 @@ public class FilmService {
         Film film = filmStorage.findById(id)
                 .orElseThrow(() -> new NotFoundObject("Фильм не найден: " + id));
 
-        List<Genre> genres = genreStorage.findGenresByFilmId(id);
-
-        TreeSet<Genre> sorted = new TreeSet<>(Comparator.comparingLong(Genre::getId));
-        sorted.addAll(genres);
-
-        film.setGenres(sorted);
+        film.setGenres(new LinkedHashSet<>(genreStorage.findGenresByFilmId(id)));
 
         return film;
     }

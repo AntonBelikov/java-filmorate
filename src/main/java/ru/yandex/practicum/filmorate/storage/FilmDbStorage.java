@@ -20,16 +20,36 @@ public class FilmDbStorage implements FilmStorage {
     private final JdbcTemplate jdbc;
     private final FilmRowMapper mapper;
     private final GenreDbStorage genreDbStorage;
+    private static final String FILM_CREATE = "INSERT INTO films(name, description, release_date, duration, mpa_id) " +
+            "VALUES (?, ?, ?, ?, ?)";
+    private static final String FILM_DELETE = "DELETE FROM films WHERE id = ?";
+    private static final String FILM_UPDATE = "UPDATE films SET name = ?, description = ?, release_date = ?, " +
+            "duration = ?, mpa_id = ? WHERE id = ?";
+    private static final String FIND_ALL_FILM = """
+                SELECT f.*, m.name AS mpa_name
+                FROM films f
+                JOIN mpa_ratings m ON f.mpa_id = m.id
+                """;
+    private static final String FIND_BY_ID = "SELECT f.*, m.name AS mpa_name FROM films f " +
+            "JOIN mpa_ratings m ON f.mpa_id = m.id WHERE f.id = ?";
+    private static final String REMOVE_GENRE = "DELETE FROM film_genres WHERE film_id = ?";
+    private static final String FILM_GENRE = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
+    private static final String ADD_LIKE = "INSERT INTO likes (film_id, user_id) VALUES (?, ?)";
+    private static final String REMOVE_LIKE = "DELETE FROM likes WHERE film_id = ? AND user_id = ?";
+    private static final String FIND_POPULAR = "SELECT f.*, m.name AS mpa_name \n" +
+            "FROM films f \n" +
+            "LEFT JOIN likes l ON f.id = l.film_id -- Используй LEFT JOIN\n" +
+            "JOIN mpa_ratings m ON f.mpa_id = m.id \n" +
+            "GROUP BY f.id, m.name \n" +
+            "ORDER BY COUNT(l.user_id) DESC, f.id ASC \n" +
+            "LIMIT ?";
 
     @Override
     public Film create(Film film) {
-        String sql = "INSERT INTO films(name, description, release_date, duration, mpa_id) " +
-                "VALUES (?, ?, ?, ?, ?)";
-
         KeyHolder keyHolder = new GeneratedKeyHolder();
 
         jdbc.update(conn -> {
-            PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            PreparedStatement ps = conn.prepareStatement(FILM_CREATE, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, film.getName());
             ps.setString(2, film.getDescription());
             ps.setObject(3, film.getReleaseDate());
@@ -45,23 +65,19 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public void delete(int id) {
-        jdbc.update("DELETE FROM films WHERE id = ?", id);
+        jdbc.update(FILM_DELETE, id);
     }
 
     @Override
     public Film update(Film film) {
-        String sql = "UPDATE films SET name = ?, description = ?, release_date = ?, " +
-                "duration = ?, mpa_id = ? WHERE id = ?";
-
-        jdbc.update(sql, film.getName(), film.getDescription(), film.getReleaseDate(),
+        jdbc.update(FILM_UPDATE, film.getName(), film.getDescription(), film.getReleaseDate(),
                 film.getDuration(), film.getMpa().getId(), film.getId());
 
-        jdbc.update("DELETE FROM film_genres WHERE film_id = ?", film.getId());
+        jdbc.update(REMOVE_GENRE, film.getId());
 
         if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            String sqlGenres = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
             for (Genre genre : film.getGenres()) {
-                jdbc.update(sqlGenres, film.getId(), genre.getId());
+                jdbc.update(FILM_GENRE, film.getId(), genre.getId());
             }
         }
 
@@ -70,13 +86,7 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Collection<Film> findAll() {
-        String sql = """
-                SELECT f.*, m.name AS mpa_name
-                FROM films f
-                JOIN mpa_ratings m ON f.mpa_id = m.id
-                """;
-
-        List<Film> films = jdbc.query(sql, mapper);
+        List<Film> films = jdbc.query(FIND_ALL_FILM, mapper);
 
         if (films.isEmpty()) {
             return films;
@@ -87,8 +97,6 @@ public class FilmDbStorage implements FilmStorage {
                 .collect(Collectors.toSet());
 
         Map<Integer, List<Genre>> genresByFilm = genreDbStorage.findGenresForFilms(ids);
-
-        Map<Integer, Set<Integer>> likesByFilm = findLikesForFilms(ids);
 
         for (Film film : films) {
             film.setGenres(new LinkedHashSet<>(
@@ -101,58 +109,21 @@ public class FilmDbStorage implements FilmStorage {
 
     @Override
     public Optional<Film> findById(int id) {
-        String sql = "SELECT f.*, m.name AS mpa_name FROM films f " +
-                "JOIN mpa_ratings m ON f.mpa_id = m.id WHERE f.id = ?";
-        return jdbc.query(sql, mapper, id).stream().findFirst();
+        return jdbc.query(FIND_BY_ID, mapper, id).stream().findFirst();
     }
 
     @Override
     public void addLike(int filmId, int userId) {
-        String sql = "INSERT INTO likes (film_id, user_id) VALUES (?, ?)";
-        jdbc.update(sql, filmId, userId);
+        jdbc.update(ADD_LIKE, filmId, userId);
     }
 
     @Override
     public void removeLike(int filmId, int userId) {
-        String sql = "DELETE FROM likes WHERE film_id = ? AND user_id = ?";
-        jdbc.update(sql, filmId, userId);
+        jdbc.update(REMOVE_LIKE, filmId, userId);
     }
 
     @Override
     public List<Film> getPopular(int count) {
-        String sql = "SELECT f.*, m.name AS mpa_name \n" +
-                "FROM films f \n" +
-                "LEFT JOIN likes l ON f.id = l.film_id -- Используй LEFT JOIN\n" +
-                "JOIN mpa_ratings m ON f.mpa_id = m.id \n" +
-                "GROUP BY f.id, m.name \n" +
-                "ORDER BY COUNT(l.user_id) DESC, f.id ASC \n" +
-                "LIMIT ?";
-        return jdbc.query(sql, mapper, count);
-    }
-
-    private Map<Integer, Set<Integer>> findLikesForFilms(Set<Integer> filmIds) {
-        if (filmIds.isEmpty()) {
-            return Map.of();
-        }
-
-        String placeholders = filmIds.stream()
-                .map(id -> "?")
-                .collect(Collectors.joining(","));
-
-        String sql = """
-                SELECT film_id, user_id
-                FROM likes
-                WHERE film_id IN (%s)
-                """.formatted(placeholders);
-
-        Map<Integer, Set<Integer>> result = new HashMap<>();
-
-        jdbc.query(sql, rs -> {
-            int filmId = rs.getInt("film_id");
-            int userId = rs.getInt("user_id");
-            result.computeIfAbsent(filmId, k -> new HashSet<>()).add(userId);
-        }, filmIds.toArray());
-
-        return result;
+        return jdbc.query(FIND_POPULAR, mapper, count);
     }
 }

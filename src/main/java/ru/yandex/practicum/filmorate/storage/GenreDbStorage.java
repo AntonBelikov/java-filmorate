@@ -14,27 +14,40 @@ import java.util.stream.Collectors;
 public class GenreDbStorage implements GenreStorage {
     private final JdbcTemplate jdbc;
     private final GenreRowMapper mapper;
+    private static final String FIND_ALL = "SELECT * FROM genres ORDER BY id";
+    private static final String FIND_BY_ID = "SELECT * FROM genres WHERE id = ?";
+    private static final String FIND_GENRE = "SELECT g.* FROM genres g " +
+            "JOIN film_genres fg ON g.id = fg.genre_id " +
+            "WHERE fg.film_id = ? " +
+            "ORDER BY g.id";
+    private static final String ADD_GENRE = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
+    private static final String FIND_BY_IDS = """
+                SELECT * FROM genres
+                WHERE id IN (%s)
+                ORDER BY id
+                """;
+    private static final String FIND_GENRES_FOR_FILM = """
+                SELECT fg.film_id, g.id, g.name
+                FROM film_genres fg
+                JOIN genres g ON g.id = fg.genre_id
+                WHERE fg.film_id IN (%s)
+                ORDER BY g.id
+                """;
 
     @Override
     public List<Genre> findAll() {
-        String sql = "SELECT * FROM genres ORDER BY id";
-        return jdbc.query(sql, mapper);
+        return jdbc.query(FIND_ALL, mapper);
     }
 
     @Override
     public Optional<Genre> findById(int id) {
-        String sql =  "SELECT * FROM genres WHERE id = ?";
-        return jdbc.query(sql, mapper, id)
+        return jdbc.query(FIND_BY_ID, mapper, id)
                 .stream()
                 .findFirst();
     }
 
     public List<Genre> findGenresByFilmId(int filmId) {
-        String sql = "SELECT g.* FROM genres g " +
-                "JOIN film_genres fg ON g.id = fg.genre_id " +
-                "WHERE fg.film_id = ? " +
-                "ORDER BY g.id";
-        return jdbc.query(sql, mapper, filmId);
+        return jdbc.query(FIND_GENRE, mapper, filmId);
     }
 
     public void addGenresToFilm(int filmId, Set<Genre> genres) {
@@ -42,12 +55,10 @@ public class GenreDbStorage implements GenreStorage {
             return;
         }
 
-        String sql = "INSERT INTO film_genres (film_id, genre_id) VALUES (?, ?)";
-
         genres.stream()
                 .map(Genre::getId)
                 .distinct()
-                .forEach(id -> jdbc.update(sql, filmId, id));
+                .forEach(id -> jdbc.update(ADD_GENRE, filmId, id));
     }
 
     @Override
@@ -60,13 +71,7 @@ public class GenreDbStorage implements GenreStorage {
                 .map(id -> "?")
                 .collect(Collectors.joining(","));
 
-        String sql = """
-                SELECT * FROM genres
-                WHERE id IN (%s)
-                ORDER BY id
-                """.formatted(placeholders);
-
-        return jdbc.query(sql, mapper, ids.toArray());
+        return jdbc.query(FIND_BY_IDS.formatted(placeholders), mapper, ids.toArray());
     }
 
     @Override
@@ -77,17 +82,9 @@ public class GenreDbStorage implements GenreStorage {
                 .map(id -> "?")
                 .collect(Collectors.joining(","));
 
-        String sql = """
-                SELECT fg.film_id, g.id, g.name
-                FROM film_genres fg
-                JOIN genres g ON g.id = fg.genre_id
-                WHERE fg.film_id IN (%s)
-                ORDER BY g.id
-                """.formatted(placeholders);
-
         Map<Integer, List<Genre>> result = new HashMap<>();
 
-        jdbc.query(sql, rs -> {
+        jdbc.query(FIND_GENRES_FOR_FILM.formatted(placeholders), rs -> {
             int filmId = rs.getInt("film_id");
             Genre genre = new Genre(rs.getInt("id"), rs.getString("name"));
 

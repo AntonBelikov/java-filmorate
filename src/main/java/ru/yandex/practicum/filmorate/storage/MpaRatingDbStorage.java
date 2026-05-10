@@ -14,17 +14,17 @@ import java.util.Optional;
 public class MpaRatingDbStorage implements MpaRatingStorage {
     private final JdbcTemplate jdbc;
     private final MpaRatingRowMapper mapper;
+    private static final String FIND_ALL =  "SELECT * FROM mpa_ratings ORDER BY id";
+    private static final String FIND_BY_ID = "SELECT * FROM mpa_ratings WHERE id = ?";
 
     @Override
     public List<MpaRating> findAll() {
-        String sql =  "SELECT * FROM mpa_ratings ORDER BY id";
-        return jdbc.query(sql, mapper);
+        return jdbc.query(FIND_ALL, mapper);
     }
 
     @Override
     public Optional<MpaRating> findById(int id) {
-        String sql = "SELECT * FROM mpa_ratings WHERE id = ?";
-        return jdbc.query(sql, mapper, id)
+        return jdbc.query(FIND_BY_ID, mapper, id)
                 .stream()
                 .findFirst();
     }
