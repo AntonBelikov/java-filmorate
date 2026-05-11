@@ -10,7 +10,6 @@ import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,8 +26,7 @@ public class UserService {
         User user1 = getUserOrElseThrow(userId);
         User user2 = getUserOrElseThrow(friendId);
 
-        user1.getFriends().add(friendId);
-        user2.getFriends().add(userId);
+        userStorage.addFriend(userId, friendId);
         log.info("Пользователь {} добавлен в друзья пользователя {}", user1, user2);
     }
 
@@ -54,28 +52,22 @@ public class UserService {
         User user1 = getUserOrElseThrow(userId);
         User user2 = getUserOrElseThrow(friendId);
 
-        user1.getFriends().remove(friendId);
-        user2.getFriends().remove(userId);
+        userStorage.removeFriend(userId, friendId);
         log.info("Пользователь {} удален из друзей пользователя {}", user1, user2);
     }
 
     public Collection<User> getUserFrinds(int id) {
         User user = getUserOrElseThrow(id);
         log.info("Получен списко друзей пользователя {}", user);
-        return user.getFriends().stream()
-                .map(userStorage::findById)
-                .flatMap(Optional::stream)
-                .collect(Collectors.toList());
+        return userStorage.getFriends(id);
     }
 
     public Collection<User> getSameFriends(int userId, int anotherUserId) {
         User user1 = getUserOrElseThrow(userId);
         User user2 = getUserOrElseThrow(anotherUserId);
         log.info("Получен списко совместных друзей пользователей {} и {}", user1, user2);
-        return user1.getFriends().stream()
-                .filter(user2.getFriends()::contains)
-                .map(userStorage::findById)
-                .flatMap(Optional::stream)
+        return userStorage.getFriends(userId).stream()
+                .filter(userStorage.getFriends(anotherUserId)::contains)
                 .collect(Collectors.toList());
     }
 
@@ -98,7 +90,7 @@ public class UserService {
 
         if (user.getLogin().isBlank() || user.getLogin().contains(" ")) {
             log.error("Ошибка в login");
-            throw new ValidationException("Логин пустой или не содержит пробелы");
+            throw new ValidationException("Логин пустой или содержит пробелы");
         }
 
         if (user.getName() == null || user.getName().isBlank()) {
